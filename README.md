@@ -38,6 +38,27 @@ Every pattern shares this same shape — a model deciding what to do, tools doin
 
 The most explicit version: a Lambda function calls the Bedrock Converse API directly, inspects the response for a tool-use request, invokes the matching tool (a Content Summarizer, Tone Adapter, or Post Writer, in this case), feeds the result back in, and loops until the model signals it's done. AWS Step Functions visualizes this as an explicit state machine, which makes the loop auditable step-by-step — useful when you need to reason about exactly what happened and why.
 
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant L as Lambda (while loop)
+    participant B as Bedrock Converse API
+    participant T as Tool (Summarizer / Adapter / Writer)
+
+    U->>L: prompt
+    loop until stopReason == end_turn
+        L->>B: Converse(messages, tools)
+        B-->>L: tool_use request or final text
+        alt model requested a tool
+            L->>T: invoke tool
+            T-->>L: tool result
+            L->>B: append result, continue reasoning
+        else model produced final answer
+            L-->>U: return response
+        end
+    end
+```
+
 **Result:** the state machine correctly routed between tool calls and looped until a finished output was produced, with each transition visible in the Step Functions graph and CloudWatch logs.
 
 ![Step Functions execution graph](docs/screenshots/lab1-stepfunctions-graph-view.png)
@@ -61,6 +82,29 @@ travel_agent = Agent(
 response = travel_agent(user_prompt)
 ```
 
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Strands Agent
+    participant KB as Knowledge Base (RAG)
+    participant MCP as MCP Gateway
+    participant W as Weather API
+
+    U->>A: "What are my options for Seattle?"
+    par
+        A->>KB: retrieve(tour operators)
+        KB-->>A: relevant docs
+    and
+        A->>MCP: list & call remote tools
+        MCP-->>A: attraction / booking data
+    and
+        A->>W: http_request(forecast)
+        W-->>A: weather data
+    end
+    A->>A: synthesize all tool results
+    A-->>U: single natural-language answer
+```
+
 **Result:** the agent authenticated against the MCP gateway, pulled live flight options and a multi-day weather forecast, and synthesized both into a single natural-language recommendation — from one prompt, with no explicit orchestration code.
 
 ![Strands agent CLI output](docs/screenshots/lab2-strands-agent-cli-output.png)
@@ -68,6 +112,25 @@ response = travel_agent(user_prompt)
 ### Pattern 3 — Managed multi-agent supervisor (Bedrock Agents)
 
 The most abstracted version: a **Supervisor** agent, configured (not coded) in Bedrock Agents, delegates to two specialized collaborators — a Flight Agent and a Weather Agent — and AWS manages the delegation logic internally.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as Supervisor Agent
+    participant F as Flight Agent
+    participant W as Weather Agent
+
+    U->>S: "Plan my SF → LA trip, Dec 1–2"
+    par
+        S->>F: get flight options
+        F-->>S: Delta / United / American + prices
+    and
+        S->>W: get forecast
+        W-->>S: severe thunderstorm warning, Dec 1
+    end
+    S->>S: synthesize — flag the conflict
+    S-->>U: flight options + weather + recommendation to reconsider the date
+```
 
 **Result — the key test:** asked to plan a same-day round trip, the Supervisor queried both sub-agents in parallel, and *synthesized their outputs against each other*: it noticed a severe thunderstorm warning from the Weather Agent and proactively flagged the conflict with the Flight Agent's results, recommending reconsidering the travel date rather than just listing both facts side by side.
 
@@ -77,7 +140,27 @@ That's the difference this project was built to explore: not just chaining tool 
 
 ## Comparison
 
-|  | Pattern | Orchestration method | Key learning |
+```mermaid
+flowchart LR
+    subgraph L1["Lab 1 — Manual Loop"]
+        direction TB
+        A1["Full control"]
+        A2["Full responsibility"]
+    end
+    subgraph L2["Lab 2 — Strands SDK"]
+        direction TB
+        B1["Framework-managed loop"]
+        B2["Fast iteration"]
+    end
+    subgraph L3["Lab 3 — Bedrock Agents"]
+        direction TB
+        C1["AWS-managed orchestration"]
+        C2["Least visibility into the loop"]
+    end
+    L1 -- less code --> L2 -- less code --> L3
+```
+
+| Lab | Pattern | Orchestration method | Key learning |
 |---|---|---|---|
 | 1 | Manual loop | Standard code (Python) + Step Functions | You're responsible for every state, retry, and tool call — high control, high complexity. |
 | 2 | Agentic SDK | Strands SDK | The library manages the loop and memory — clean code, fast development. |
@@ -106,4 +189,18 @@ That's the difference this project was built to explore: not just chaining tool 
     ├── architecture-notes.md
     └── screenshots/
 ```
+
+## What I'd explore next
+
+- Caching the MCP OAuth2 token instead of fetching it on every invocation (Lab 2 currently re-authenticates per request)
+- Extending the flight/weather tools beyond their current hardcoded destinations
+- Adding automated evaluation of agent responses rather than manual console testing
+
+## Attribution
+
+The three labs are based on AWS's official agentic AI workshops (Strands Agents SDK, Amazon Bedrock, AWS Step Functions, Amazon Bedrock Agents). The architecture comparison, testing, and analysis above are my own.
+
+## About
+
+Built by [Mayu Kataoka](https://github.com/mayukataoka) — quality engineering background, exploring applied AI/agent systems.
 
