@@ -77,7 +77,7 @@ That's the difference this project was built to explore: not just chaining tool 
 
 ## Comparison
 
-| Lab | Pattern | Orchestration method | Key learning |
+|  | Pattern | Orchestration method | Key learning |
 |---|---|---|---|
 | 1 | Manual loop | Standard code (Python) + Step Functions | You're responsible for every state, retry, and tool call — high control, high complexity. |
 | 2 | Agentic SDK | Strands SDK | The library manages the loop and memory — clean code, fast development. |
@@ -107,16 +107,3 @@ That's the difference this project was built to explore: not just chaining tool 
     └── screenshots/
 ```
 
-## What I'd explore next
-
-- Caching the MCP OAuth2 token instead of fetching it on every invocation (Lab 2 currently re-authenticates per request)
-- Extending the flight/weather tools beyond their current hardcoded destinations
-- Adding automated evaluation of agent responses rather than manual console testing
-
-## Attribution
-
-The three labs are based on AWS's official agentic AI workshops (Strands Agents SDK, Amazon Bedrock, AWS Step Functions, Amazon Bedrock Agents). The architecture comparison, testing, and analysis above are my own.
-
-## About
-
-Built by [Mayu Kataoka](https://github.com/mayukataoka) — quality engineering background, exploring applied AI/agent systems.
