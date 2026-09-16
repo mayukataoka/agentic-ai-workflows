@@ -1,14 +1,14 @@
 # Agentic AI Workflows on AWS
 
-**Comparing three ways to build an AI agent — a hand-rolled reasoning loop, an SDK-managed agent, and a fully managed multi-agent system — through a working travel-planning assistant.**
+**Comparing three ways to build an AI agent — a hand-rolled reasoning loop, an SDK-managed agent, and a fully managed multi-agent system — through working examples on AWS.**
 
-Most tutorials show you one way to build an agent. This project builds the *same* agent three times, using three different orchestration approaches, to understand the actual trade-offs between control, development speed, and visibility — not just read about them.
+Most tutorials show you one way to build an agent. This project implements the *same loop* three times, using three different orchestration approaches, to understand the actual trade-offs between control, development speed, and visibility — not just read about them.
 
 ---
 
 ## Overview
 
-An "agent" is a loop: a model reasons about a request, decides whether it needs a tool, calls that tool, incorporates the result, and repeats until the task is done. How much of that loop *you* write, versus how much a framework or managed service writes for you, is one of the more consequential decisions in building an agent system — it trades off control against velocity against operational visibility.
+An "agent" is a loop: a model reasons about a request, decides whether it needs a tool, calls that tool, incorporates the result, and repeats until the task is done. How much of that loop *you* write, versus how much a framework or managed service writes for you, is a decision I wanted to understand by building it rather than reading about it.
 
 This project implements that loop three ways on AWS:
 
@@ -17,6 +17,8 @@ This project implements that loop three ways on AWS:
 | 1 | **Manual reasoning loop** | Raw Python `while` loop + AWS Step Functions, calling the Bedrock Converse API directly | You own every state, retry, and tool call. Maximum control, maximum responsibility. |
 | 2 | **SDK-driven agent** | [Strands Agents SDK](https://strandsagents.com) on AWS Lambda | The framework manages the loop, session memory, and tool-calling. Clean code, fast iteration. |
 | 3 | **Managed multi-agent** | Amazon Bedrock Agents, Supervisor + collaborator pattern | AWS manages orchestration between a Supervisor and specialized sub-agents. High scalability, less visibility into the reasoning path. |
+
+Labs 2 and 3 use a travel-planning assistant. Lab 1 runs a different task — a content pipeline — because what's being compared is the loop itself, not the domain.
 
 ## Architecture
 
@@ -129,6 +131,7 @@ sequenceDiagram
     S->>S: synthesize — flag the conflict
     S-->>U: flight options + weather + recommendation to reconsider the date
 ```
+
 **Result — the key test:** asked to plan a same-day round trip, the Supervisor queried both sub-agents in parallel, and *synthesized their outputs against each other*: it noticed a severe thunderstorm warning from the Weather Agent and proactively flagged the conflict with the Flight Agent's results, recommending reconsidering the travel date rather than just listing both facts side by side.
 
 ![Bedrock Agents supervisor chat](docs/screenshots/lab3-bedrock-supervisor-chat.png)
@@ -173,24 +176,28 @@ flowchart LR
 - **API & auth:** Amazon API Gateway, Amazon Cognito
 - **Observability:** Amazon CloudWatch (Application Signals / X-Ray trace maps)
 
-## Repository structure
+## What's in this repository
+
+This repo holds the write-up above and the execution evidence behind it:
 
 ```
 .
 ├── README.md
-├── lab-1-manual-loop/        # Step Functions state machine + Lambda reasoning loop
-├── lab-2-strands-sdk/        # Strands agent, RAG, MCP client integration
-├── lab-3-bedrock-agents/     # Supervisor + collaborator agent configuration
-└── docs/
-    ├── architecture-notes.md
-    └── screenshots/
+└── docs/screenshots/
+    ├── lab1-stepfunctions-graph-view.png     # state machine, all transitions succeeded
+    ├── lab1-stepfunctions-converse-output.png
+    ├── lab1-cloudwatch-tool-trace.png        # three tool invocations in one execution
+    ├── lab2-strands-agent-cli-output.png     # authenticated API call, synthesized answer
+    └── lab3-bedrock-supervisor-chat.png      # supervisor flagging the weather conflict
 ```
+
+The three labs were built and run in AWS following the workshops linked under Attribution, and then torn down to avoid standing costs. Deployable source for each lab lives in those workshops rather than being re-hosted here; what's mine is the comparison, the testing, and the analysis.
 
 ## What I'd explore next
 
 - Caching the MCP OAuth2 token instead of fetching it on every invocation (Lab 2 currently re-authenticates per request)
-- Extending the flight/weather tools beyond their current hardcoded destinations
-- Adding automated evaluation of agent responses rather than manual console testing
+- Extending the flight/weather tools beyond their current hardcoded destinations — an unsupported city currently raises inside the tool and surfaces as a generic 500, which makes it indistinguishable from a throttle or an auth failure
+- Replacing manual console testing with an automated evaluation suite: asserting on the tool trajectory rather than only the final answer, and counting side effects rather than trusting the response text
 
 ## Attribution
 
