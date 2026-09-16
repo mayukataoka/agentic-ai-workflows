@@ -75,7 +75,17 @@ sequenceDiagram
     end
 ```
 
-**Result:** routed correctly through three tool calls in one execution, each step visible in the graph and the logs. The model's choices are still non-deterministic — what this buys you is a complete record of what it chose.
+One execution, as it appears in the logs:
+
+```
+INFO  Invoking tool: CONTENT_SUMMARIZER
+INFO  Invoking tool: TONE_ADAPTER
+INFO  Invoking tool: POST_WRITER
+INFO  <thinking>The tools have done an excellent job of creating a...
+REPORT  Duration: 20523.04 ms
+```
+
+**Result:** three tool calls chained in one run, each transition visible in the graph and the logs. The model's choices are still non-deterministic — what this buys you is a complete record of what it chose, and a 20-second execution you can account for step by step.
 
 ![Step Functions execution graph](docs/screenshots/lab1-stepfunctions-graph-view.png)
 ![CloudWatch tool invocation trace](docs/screenshots/lab1-cloudwatch-tool-trace.png)
@@ -98,7 +108,21 @@ Two things make this more than a tool-calling demo:
 - **RAG** — a Bedrock Knowledge Base over private S3 data, reached through the built-in `retrieve` tool
 - **MCP** — tools discovered at runtime from an external server (AgentCore Gateway, OAuth2 via Cognito), so new tools appear without redeploying
 
-**Result:** authenticated to the gateway, pulled flights and a multi-day forecast, and answered with both — from one prompt, with no orchestration code.
+One prompt, two different tools, one answer:
+
+```
+Ask:  "Can you tell me travel options to Seattle?"
+
+Got:  "You can fly to Seattle with either Alaska Airlines or Delta Airlines.
+
+       For the weather, here's a summary of the forecast:
+       Tonight   — Light Rain then Rain And Snow Likely, low 35°F, 60%
+       Monday    — Rain And Snow, high near 46°F, 80%
+       Tuesday   — Light Snow Likely then Light Rain, high near 45°F, 100%
+       ..."
+```
+
+**Result:** authenticated to the gateway, called the flight tool and chained two National Weather Service requests, and returned both as one answer — with no orchestration code.
 
 ![Strands agent CLI output](docs/screenshots/lab2-strands-agent-cli-output.png)
 
@@ -116,7 +140,20 @@ flowchart TD
     S --> R["Flights + forecast +<br/>a warning to move the date"]
 ```
 
-**Result — the interesting one:** the Weather Agent returned a severe thunderstorm warning for Dec 1. The Supervisor didn't just print both answers side by side — it noticed the conflict with the flight options and recommended changing the date.
+```
+Ask:  "Plan a trip from San Francisco to Los Angeles, departing
+       December 1st and returning the following day."
+
+Got:  Flights — Delta $435, United $375, American $725
+      Weather — Dec 1: 58°F, SEVERE THUNDERSTORM WARNING
+                Dec 2: 83°F
+
+      "Due to the severe thunderstorm warning on December 1st, I suggest
+       considering alternative travel dates to ensure your safety and
+       minimize potential flight disruptions."
+```
+
+**Result — the interesting one:** the Supervisor didn't just print both answers side by side. It noticed that the weather conflicted with the flights it had just been handed, and recommended changing the date.
 
 ![Bedrock Agents supervisor chat](docs/screenshots/lab3-bedrock-supervisor-chat.png)
 
