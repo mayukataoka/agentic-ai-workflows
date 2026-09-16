@@ -75,7 +75,7 @@ sequenceDiagram
     end
 ```
 
-**Result:** routed correctly through three tool calls in one execution, each step visible in the graph and the logs.
+**Result:** routed correctly through three tool calls in one execution, each step visible in the graph and the logs. The model's choices are still non-deterministic — what this buys you is a complete record of what it chose.
 
 ![Step Functions execution graph](docs/screenshots/lab1-stepfunctions-graph-view.png)
 ![CloudWatch tool invocation trace](docs/screenshots/lab1-cloudwatch-tool-trace.png)
@@ -120,9 +120,18 @@ flowchart TD
 
 ![Bedrock Agents supervisor chat](docs/screenshots/lab3-bedrock-supervisor-chat.png)
 
-That's the behaviour worth building for: not chaining tool calls, but weighing their results against each other.
+That's the behaviour worth building for: not chaining tool calls, but weighing their results against each other. It's also the behaviour that's hardest to test for, since nothing in the configuration guarantees it happens next time.
 
 ---
+
+## Evaluation notes
+
+Testing this taught me more than building it did. What I'd build next, in order:
+
+- **Trajectory assertions, not text matching.** Assert on which tool was called with which arguments. An agent that returns the right answer without calling the tool is reciting, and it will go stale silently the moment the data changes.
+- **Side-effect counting.** The reservation path writes. Verifying it means counting reservations created, not trusting the sentence claiming one was. Repeating the same request currently creates a second booking.
+- **Error isolation.** An unsupported city raises inside the tool and comes back as a generic 500 — indistinguishable from a throttle or an auth failure. Tool errors, model reasoning failures, and throttling need to be separable before any of this is operable.
+- **Token caching.** Lab 2 re-authenticates to the MCP gateway on every invocation.
 
 ## Built with
 
@@ -136,12 +145,6 @@ docs/screenshots/    execution evidence for all three labs
 ```
 
 The labs were built and run in AWS following the workshops linked below, then torn down to avoid standing costs. Deployable source lives in those workshops. What's mine is the comparison, the testing, and the analysis.
-
-## What I'd do next
-
-- Cache the MCP OAuth2 token instead of re-authenticating on every invocation
-- Fix error handling: an unsupported city raises inside the tool and comes back as a generic 500, indistinguishable from a throttle or an auth failure
-- Replace console testing with an automated eval suite — assert on which tools were called, not just the final text, and count side effects rather than trusting the response
 
 ## Attribution
 
