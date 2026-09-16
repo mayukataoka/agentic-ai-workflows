@@ -34,6 +34,46 @@ flowchart LR
 
 Every pattern shares this same shape — a model deciding what to do, tools doing the work, a knowledge base grounding it in real data. What differs is *who's responsible for driving the loop*.
 
+## What the agent actually does
+
+These are real exchanges with the Lab 2 deployment, through its API Gateway
+endpoint — `POST /chat`, behind a Cognito authorizer, with the conversation
+session keyed to the authenticated username.
+
+**A local tool.** No routing logic in the code: the model reads the question, picks `flight_search`, and passes `"Seattle"` itself.
+
+```
+{"prompt": "What are the flight options to Seattle?"}
+→ "Here are the flight options to Seattle: Alaska Airlines, Delta Airlines"
+```
+
+**An external API.** Two chained calls to the National Weather Service — grid lookup, then forecast — surfaced to the caller as a single answer.
+
+```
+{"prompt": "What is the weather forecast for Seattle?"}
+→ "5-day forecast for Seattle: today 57°F, 69% chance of rain..."
+```
+
+**Session memory.** The destination is never repeated in the follow-up.
+
+```
+{"prompt": "Can you tell me some local things to do?"}
+→ "In Seattle, you can visit the Space Needle, Pike Place Market..."
+```
+
+**Retrieval over private data.** Only operators present in the S3-indexed partner list come back; general knowledge isn't a valid source for this question.
+
+```
+{"prompt": "What are some tour operators with water activities?"}
+```
+
+**A write, over MCP.** This one creates a reservation — which is why it's the case worth testing hardest, and the one where repeating the request matters.
+
+```
+{"prompt": "Reserve a ticket for the Space Needle on December 20th at 9 AM"}
+→ "Your ticket has been reserved. Reservation code: W8VPWZ"
+```
+
 ## The three patterns, in more detail
 
 ### Pattern 1 — Manual reasoning loop (Step Functions + Lambda)
